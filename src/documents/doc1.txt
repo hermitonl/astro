@@ -1,0 +1,4 @@
+This is the content of document 1.
+It contains some basic information that the Q&A system can use.
+The main topic is Astro integration with external APIs like Gemini and Permit.io.
+Sensitive details are not included here, but imagine this could be a confidential report.

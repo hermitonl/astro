@@ -1,14 +1,14 @@
 import { MongoClient } from 'mongodb';
-import { Permit } from 'permitio';
+// No longer importing Permit SDK
+import dotenv from "dotenv"; // Import dotenv
 
-// Initialize Permit SDK
-const permit = new Permit({
-  token: import.meta.env.PERMIT_TOKEN || '',
-  pdp: 'https://cloudpdp.api.permit.io',
-});
+dotenv.config(); // Load .env variables
+
+// Define PDP URL (use environment variable or default)
+const PDP_URL = process.env.PERMIT_PDP_URL || "http://localhost:7766"; // Defaulting to local PDP, adjust if using cloud PDP
 
 // MongoDB Connection URI
-const uri = import.meta.env.MONGODB_URI || '';
+const uri = process.env.MONGODB_URI || ''; // Use consistent env var name
 let client; // Declare client outside try block
 
 // Define database and collection names (as per user feedback)
@@ -70,17 +70,36 @@ export async function GET({ request }) {
     if (userRole === 'basic') {
       // 2. If role is 'basic', check permission for the predefined proxy user in Permit.io
       console.log(`User role is 'basic'. Checking Permit.io for proxy user '${PROXY_USER_KEY_FOR_BASIC_ROLE}', action: read, resource: Blog`);
+      // --- Direct PDP Check using fetch for Proxy User ---
+      const pdpPayload = {
+          user: { key: PROXY_USER_KEY_FOR_BASIC_ROLE },
+          action: { key: 'read' },
+          resource: { type: 'Blog' }, // Assuming 'Blog' is the resource type
+          // tenant: "default", // Add if using multi-tenancy
+          // context: {}, // Add if using context
+      };
+
       try {
-        // This check relies on '_proxy_for_basic_role' user existing in Permit.io
-        // and having a role (e.g., 'basic') assigned *within Permit.io* that grants read:Blog.
-        permitted = await permit.check(
-          PROXY_USER_KEY_FOR_BASIC_ROLE,
-          'read',
-          'Blog'
-        );
-      } catch (permitError) {
-        console.error(`Permit.io check failed for proxy user '${PROXY_USER_KEY_FOR_BASIC_ROLE}':`, permitError);
-        permitted = false; // Fail closed on error
+          const pdpResponse = await fetch(`${PDP_URL}/allowed`, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${process.env.PERMIT_API_KEY}` // Use consistent API key name
+              },
+              body: JSON.stringify(pdpPayload)
+          });
+
+          if (!pdpResponse.ok) {
+              const errorText = await pdpResponse.text();
+              console.error(`PDP request failed for proxy user '${PROXY_USER_KEY_FOR_BASIC_ROLE}': ${pdpResponse.status} - ${errorText}`);
+              permitted = false;
+          } else {
+              const pdpResult = await pdpResponse.json();
+              permitted = pdpResult?.allow === true;
+          }
+      } catch (pdpError) {
+          console.error(`Error contacting Permit PDP for proxy user '${PROXY_USER_KEY_FOR_BASIC_ROLE}':`, pdpError);
+          permitted = false; // Fail closed on error
       }
     } else {
       // 3. If user role from DB is not 'basic', deny access.

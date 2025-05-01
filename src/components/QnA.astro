@@ -1,0 +1,137 @@
+---
+// src/components/QnA.astro
+---
+<div id="qna-container" class="qna-container">
+  <h2>Ask a Question about a Document</h2>
+  <form id="qna-form">
+    <div class="form-group">
+      <label for="userId">User ID:</label>
+      <input type="text" id="userId" name="userId" required value="user_123"> {/* Pre-fill for testing */}
+    </div>
+    <div class="form-group">
+      <label for="documentId">Document ID:</label>
+      <input type="text" id="documentId" name="documentId" required placeholder="e.g., doc1">
+    </div>
+    <div class="form-group">
+      <label for="question">Question:</label>
+      <textarea id="question" name="question" rows="3" required placeholder="What is the main topic?"></textarea>
+    </div>
+    <button type="submit" id="submit-btn">Ask Gemini</button>
+  </form>
+  <div id="response-area" class="response-area" aria-live="polite">
+    <p><strong>Answer:</strong></p>
+    <pre id="answer"></pre>
+    <p id="error-message" class="error-message"></p>
+  </div>
+</div>
+
+<style>
+.qna-container {
+  border: 1px solid #ccc;
+  padding: 20px;
+  border-radius: 8px;
+  max-width: 600px;
+  margin: 20px auto;
+  font-family: sans-serif;
+}
+.form-group {
+  margin-bottom: 15px;
+}
+label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+input[type="text"],
+textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  box-sizing: border-box; /* Include padding and border in element's total width and height */
+}
+textarea {
+  resize: vertical;
+}
+button {
+  background-color: #007bff;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1em;
+}
+button:hover {
+  background-color: #0056b3;
+}
+button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
+}
+.response-area {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border: 1px solid #eee;
+  border-radius: 4px;
+  min-height: 50px;
+}
+.response-area pre {
+  white-space: pre-wrap; /* Wrap long lines */
+  word-wrap: break-word;
+  margin-top: 5px;
+}
+.error-message {
+    color: red;
+    font-weight: bold;
+}
+</style>
+
+<script>
+  const form = document.getElementById('qna-form');
+  const responseArea = document.getElementById('response-area');
+  const answerEl = document.getElementById('answer');
+  const errorEl = document.getElementById('error-message');
+  const submitBtn = document.getElementById('submit-btn');
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    submitBtn.disabled = true;
+    answerEl.textContent = 'Loading...';
+    errorEl.textContent = '';
+
+    const formData = new FormData(form);
+    const data = {
+      userId: formData.get('userId'),
+      question: formData.get('question'),
+      documentId: formData.get('documentId'),
+    };
+
+    try {
+      const response = await fetch('/api/qa', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        // Throw an error with the message from the API response
+        throw new Error(result.error || `HTTP error! status: ${response.status}`);
+      }
+
+      answerEl.textContent = result.answer;
+
+    } catch (error) {
+      console.error('Error fetching Q&A:', error);
+      answerEl.textContent = ''; // Clear loading/previous answer
+      errorEl.textContent = `Error: ${error.message}`;
+    } finally {
+       submitBtn.disabled = false;
+    }
+  });
+</script>

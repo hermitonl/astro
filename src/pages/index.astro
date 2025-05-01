@@ -1,11 +1,14 @@
 ---
 import Layout from '../layouts/Layout.astro';
 import BlogList from '../components/BlogList';
+import QnA from '../components/QnA.astro'; // Import the new component
 ---
 
 <Layout title="Blog Application">
 	<main>
 		<BlogList client:only="react" />
+		<hr /> {/* Add a separator */}
+		<QnA /> {/* Add the QnA component */}
 	</main>
 </Layout>
 
